@@ -124,6 +124,11 @@ static void usage(int exitcode);
 static const char *interp_prefix = CONFIG_QEMU_INTERP_PREFIX;
 const char *qemu_uname_release;
 
+#ifdef EQEMU
+char    *myprog_path;
+char    *plugin_enf;
+#endif /* EQEMU */
+
 /* XXX: on x86 MAP_GROWSDOWN only works if ESP <= address + 32, so
    we allocate a bigger stack. Need a better solution, for example
    by remapping the process stack directly at the right place */
@@ -654,7 +659,45 @@ int main(int argc, char **argv, char **envp)
     module_call_init(MODULE_INIT_TRACE);
     qemu_init_cpu_list();
     module_call_init(MODULE_INIT_QOM);
-
+#ifdef EQEMU
+    {
+        int i;
+        for (i = 0; i < argc; i++) {
+            fprintf(stderr, "%s: argv[%d] = %s\n", __func__, i, argv[i]);
+        }
+    }
+    if (*argv[0] == '/') {
+        myprog_path = strdup(argv[0]);
+    } else {
+        char    buf[PATH_MAX]; /* linux/limits.h */
+        size_t  len;
+        int     rc;
+        assert(getcwd(buf, PATH_MAX) != 0);
+        len = strlen(buf) + strlen(argv[0]) + 2; /* "/" and null */
+        if (len > PATH_MAX) {
+            fprintf(stderr, "The command path is too long.\n");
+            exit(EXIT_FAILURE);
+        }
+        myprog_path = malloc(len);
+        strcpy(myprog_path, buf);
+        strcat(myprog_path, "/");
+        strcat(myprog_path, argv[0]);
+        rc = access(myprog_path, X_OK);
+        if (rc != 0) {
+            fprintf(stderr, "The command specified by argv[0] cannot be executed for execve syscall\n");
+            exit(EXIT_FAILURE);
+        }
+    }
+    {   /* QEMU_PLUGIN_ENFORCEMENT environment variable */
+        char *plugin = getenv("QEMU_PLUGIN_ENFORCEMENT");
+        if (plugin) {
+            fprintf(stderr, "%s: Enforcement plugin = %s\n", __func__, plugin);
+            plugin_enf = strdup(plugin);
+        } else {
+            plugin_enf = NULL;
+        }
+    }
+#endif /* EQEMU */
     envlist = envlist_create();
 
     /* add current environment into the list */

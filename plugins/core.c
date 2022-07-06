@@ -487,6 +487,25 @@ void qemu_plugin_register_atexit_cb(qemu_plugin_id_t id,
     plugin_register_cb_udata(id, QEMU_PLUGIN_EV_ATEXIT, cb, udata);
 }
 
+#ifdef EQEMU
+void
+qemu_plugin_enforcement(CPUState *cpu, int64_t num, uint64_t a1, uint64_t a2,
+                         uint64_t a3, uint64_t a4, uint64_t a5,
+                         uint64_t a6, uint64_t a7, uint64_t a8)
+{
+    struct qemu_plugin_cb *cb, *next;
+    enum qemu_plugin_event ev = QEMU_PLUGIN_ENFORCEMENT;
+    // fprintf(stderr, "%s: checking Enforcement plugin\n", __func__);
+    if (test_bit(ev, cpu->plugin_mask)) { /* defined */
+        QLIST_FOREACH_SAFE_RCU(cb, &plugin.cb_lists[ev], entry, next) {
+            qemu_plugin_enforcement_cb_t func = cb->f.vcpu_syscall;
+            func(cb->ctx->id, cpu->cpu_index,
+                 num, a1, a2, a3, a4, a5, a6, a7, a8);
+        }
+    }
+}
+#endif /* EQEMU */
+
 /*
  * Handle exit from linux-user. Unlike the normal atexit() mechanism
  * we need to handle the clean-up manually as it's possible threads

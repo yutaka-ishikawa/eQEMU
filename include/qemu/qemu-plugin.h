@@ -516,6 +516,16 @@ void
 qemu_plugin_register_vcpu_syscall_ret_cb(qemu_plugin_id_t id,
                                          qemu_plugin_vcpu_syscall_ret_cb_t cb);
 
+#ifdef EQEMU
+typedef void
+(*qemu_plugin_enforcement_cb_t)(qemu_plugin_id_t id, unsigned int vcpu_index,
+                                int64_t num, uint64_t a1, uint64_t a2,
+                                uint64_t a3, uint64_t a4, uint64_t a5,
+                                uint64_t a6, uint64_t a7, uint64_t a8);
+void
+qemu_plugin_register_enforcement_cb(qemu_plugin_id_t id,
+                                    qemu_plugin_enforcement_cb_t cb);
+#endif /* EQEMU */
 
 /**
  * qemu_plugin_insn_disas() - return disassembly string for instruction

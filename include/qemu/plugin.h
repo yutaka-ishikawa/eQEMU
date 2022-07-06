@@ -27,6 +27,9 @@ enum qemu_plugin_event {
     QEMU_PLUGIN_EV_VCPU_SYSCALL_RET,
     QEMU_PLUGIN_EV_FLUSH,
     QEMU_PLUGIN_EV_ATEXIT,
+#ifdef EQEMU
+    QEMU_PLUGIN_ENFORCEMENT,
+#endif /* EQEMU */
     QEMU_PLUGIN_EV_MAX, /* total number of plugin events we support */
 };
 
@@ -224,6 +227,14 @@ void qemu_plugin_disable_mem_helpers(CPUState *cpu);
  */
 void qemu_plugin_user_exit(void);
 
+#ifdef EQEMU
+extern char *myprog_path;
+extern char *plugin_enf;
+extern void qemu_plugin_enforcement(CPUState *cpu,
+                                    int64_t num, uint64_t a1, uint64_t a2,
+                                    uint64_t a3, uint64_t a4, uint64_t a5,
+                                    uint64_t a6, uint64_t a7, uint64_t a8);
+#endif /* EQEMU */
 #else /* !CONFIG_PLUGIN */
 
 static inline void qemu_plugin_add_opts(void)
@@ -287,6 +298,13 @@ static inline void qemu_plugin_disable_mem_helpers(CPUState *cpu)
 
 static inline void qemu_plugin_user_exit(void)
 { }
+#ifdef EQEMU
+static inline void
+qemu_plugin_enforcement(CPUState *cpu,
+                        int64_t num, uint64_t a1, uint64_t a2,
+                        uint64_t a3, uint64_t a4, uint64_t a5,
+                        uint64_t a6, uint64_t a7, uint64_t a8);
+#endif /* EQUEMU */
 #endif /* !CONFIG_PLUGIN */
 
 #endif /* QEMU_PLUGIN_H */

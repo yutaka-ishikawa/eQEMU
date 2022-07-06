@@ -167,6 +167,14 @@ qemu_plugin_register_vcpu_syscall_ret_cb(qemu_plugin_id_t id,
     plugin_register_cb(id, QEMU_PLUGIN_EV_VCPU_SYSCALL_RET, cb);
 }
 
+#ifdef EQEMU
+void qemu_plugin_register_enforcement_cb(qemu_plugin_id_t id,
+                                          qemu_plugin_enforcement_cb_t cb)
+{
+    plugin_register_cb(id, QEMU_PLUGIN_ENFORCEMENT, cb);
+}
+#endif /* EQEMU */
+
 /*
  * Plugin Queries
  *

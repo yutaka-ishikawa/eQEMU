@@ -8756,6 +8756,18 @@ static abi_long do_syscall1(CPUArchState *cpu_env, int num, abi_long arg1,
             abi_ulong addr;
             char **q;
 
+#ifdef EQEMU
+            int enf = 0; /* enforcement flag and also for offset value of argp */
+            {
+                enum qemu_plugin_event ev = QEMU_PLUGIN_ENFORCEMENT;
+                if (test_bit(ev, cpu->plugin_mask)) { /* defined */
+                    enf = 5;
+                    fprintf(stderr, "%s: ENFORCEMENT PLUGIN ADDED."
+                            "\tPROG PATH=%s" "\tPLUGIN=%s\n",
+                            __func__, myprog_path, plugin_enf);
+                }
+            }
+#endif /* EQEMU */
             argc = 0;
             guest_argp = arg2;
             for (gp = guest_argp; gp; gp += sizeof(abi_ulong)) {
@@ -8775,6 +8787,28 @@ static abi_long do_syscall1(CPUArchState *cpu_env, int num, abi_long arg1,
                 envc++;
             }
 
+#ifdef EQEMU
+            fprintf(stderr, "%s: YI!!!!! argc = %d enf = %d\n", __func__, argc, enf);
+            argp = g_new0(char *, argc + 1 + enf);
+            envp = g_new0(char *, envc + 1);
+            if (enf) { /* enf must be 5 */
+                argp[0] = strdup(myprog_path);
+                argp[1] = strdup("-plugin");
+                argp[2] = strdup(plugin_enf);
+                argp[3] = strdup("-0");
+            }
+
+            for (gp = guest_argp, q = argp + enf; gp;
+                  gp += sizeof(abi_ulong), q++) {
+                if (get_user_ual(addr, gp))
+                    goto execve_efault;
+                if (!addr)
+                    break;
+                if (!(*q = lock_user_string(addr)))
+                    goto execve_efault;
+            }
+            *q = NULL;
+#else
             argp = g_new0(char *, argc + 1);
             envp = g_new0(char *, envc + 1);
 
@@ -8788,7 +8822,8 @@ static abi_long do_syscall1(CPUArchState *cpu_env, int num, abi_long arg1,
                     goto execve_efault;
             }
             *q = NULL;
-
+#endif /* EQEMU */
+            
             for (gp = guest_envp, q = envp; gp;
                   gp += sizeof(abi_ulong), q++) {
                 if (get_user_ual(addr, gp))
@@ -8800,6 +8835,42 @@ static abi_long do_syscall1(CPUArchState *cpu_env, int num, abi_long arg1,
             }
             *q = NULL;
 
+#ifdef EQEMU
+            if (enf == 0) {
+                if (!(p = lock_user_string(arg1)))
+                    goto execve_efault;
+            } else {
+                /*
+                 *  system("ls -l");
+                 *    arg1 = "/bin/sh"
+                 *    argv = arg2
+                 *    argv[0] = "sh", argv[1] = "-c", argv[2] = "ls",
+                 *    argv[3] = "-l", argv[4] = NULL
+                 *  --> path = "/.../qemu-x86_64"
+                 *      argv[0] = "/.../qemu-x86_64", argv[1] = "-plugin"
+                 *      argv[2] = "./libplugin.so", argv[3] = "-0",
+                 *      argv[4] = "sh",
+                 *      argv[5] = "/bin/sh", argv[6] = "-c", argv[7] = "ls",
+                 *      argv[8] = "-l", argv[9] = NULL
+                 *
+                 */
+                /* The command is myself */
+                p = (void*) myprog_path;
+                argp[4] = argp[5];  /* -0 argument */
+                argp[5] = lock_user_string(arg1); /* binary command */
+                if (argp[5] == NULL) {
+                    fprintf(stderr, "%s: EXECVE EFAULT", __func__);
+                    goto execve_efault;
+                }
+                {   /* p is arg1 */
+                    int i;
+                    fprintf(stderr, "%s: p = %s\n", __func__, (char*)p);
+                    for (i = 0; i < argc + enf + 1; i++) {
+                        fprintf(stderr, "%s: argp[%d] = %s\n", __func__, i, argp[i]);
+                    }
+                }
+            }
+#else
             if (!(p = lock_user_string(arg1)))
                 goto execve_efault;
             /* Although execve() is not an interruptible syscall it is
@@ -8812,6 +8883,7 @@ static abi_long do_syscall1(CPUArchState *cpu_env, int num, abi_long arg1,
              * before the execve completes and makes it the other
              * program's problem.
              */
+#endif /* EQEMU */
             ret = get_errno(safe_execve(p, argp, envp));
             unlock_user(p, arg1, 0);
 
@@ -8836,6 +8908,14 @@ static abi_long do_syscall1(CPUArchState *cpu_env, int num, abi_long arg1,
                 unlock_user(*q, addr, 0);
             }
 
+#ifdef EQEMU
+            if (enf) {
+                free(argp[0]);
+                free(argp[1]);
+                free(argp[2]);
+                free(argp[3]);
+            }
+#endif /* EQEMU */
             g_free(argp);
             g_free(envp);
         }
@@ -13171,6 +13251,10 @@ abi_long do_syscall(CPUArchState *cpu_env, int num, abi_long arg1,
         }
     }
 #endif
+#ifdef EQEMU
+    qemu_plugin_enforcement(cpu, num, arg1, arg2, arg3,
+                            arg4, arg5, arg6, arg7, arg8);
+#endif /* EQEMU */
 
     record_syscall_start(cpu, num, arg1,
                          arg2, arg3, arg4, arg5, arg6, arg7, arg8);

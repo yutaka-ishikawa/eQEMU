@@ -1,0 +1,15 @@
+What have been modified
+(0) Not modified, but requiring the -DEQEMU flag for CC.
+   i.e.,
+	$ ../configure --extra-cflags=-DEQEMU \
+	               --target-list="aarch64-linux-user,x86_64-linux-user"
+    The -DEQEMU flag is not included config-host.mak, but is included
+    in the build.ninja file.
+(1) The following files are modified.
+	modified:   include/qemu/plugin.h
+	modified:   include/qemu/qemu-plugin.h
+	modified:   linux-user/main.c
+	modified:   linux-user/syscall.c
+	modified:   plugins/api.c
+	modified:   plugins/core.c
+	modified:   plugins/qemu-plugins.symbols
